@@ -2,7 +2,7 @@
 
     $ mkdir ~/work
     $ cd work
-    $ git clone X
+    $ git clone https://github.com/milewrog/java_encryption_example.git
 
 
 ##### Running the Example
