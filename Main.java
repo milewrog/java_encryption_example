@@ -228,7 +228,7 @@ class Main
       byte[] receivedIVBytes = asymmetricDecryptor.decrypt(encryptedIV);
       IvParameterSpec receivedIV = new IvParameterSpec(receivedIVBytes);
 
-      // Descrypt the message.
+      // Decrypt the message.
       SymmetricDecryptor symmetricDecryptor = new SymmetricDecryptor(receivedSecretKey, receivedIV);
       byte[] receivedMessageBytes = symmetricDecryptor.decrypt(encryptedMessage);
 
