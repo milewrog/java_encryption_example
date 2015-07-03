@@ -7,6 +7,7 @@
 
 ##### Running the Example
 
+    $ cd ~/work/java_encryption_example
     $ ./generate_keys.sh
     $ ./build.sh
     $ ./run.sh
