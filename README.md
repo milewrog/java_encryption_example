@@ -1,3 +1,9 @@
+##### Prerequisites
+
+  - [Java SE JDK 8](http://www.oracle.com/technetwork/java/javase/downloads/jdk8-downloads-2133151.html)
+  - [JCE Unlimited Strength Jurisdiction Policy Files 8](http://www.oracle.com/technetwork/java/javase/downloads/jce8-download-2133166.html)
+
+
 ##### Installation
 
     $ mkdir ~/work
