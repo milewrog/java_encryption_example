@@ -10,6 +10,11 @@ import javax.crypto.spec.*;
 //
 class SymmetricEncryptor
 {
+  public static final String KEY_ALGORITHM    = "AES";
+  public static final String CIPHER_ALGORITHM = "AES/CBC/PKCS5Padding";
+  public static final int    KEY_LENGTH_BITS  = 256;
+  public static final int    IV_LENGTH_BYTES  = 16;                           // 256/8 = 32; however, iv must be 16 bytes long (TODO: why?).
+
   private SecretKey _key;
   private IvParameterSpec _iv;
   private Cipher _cipher;
@@ -38,21 +43,21 @@ class SymmetricEncryptor
 
   private static SecretKey generateSymmetricKey() throws Exception
   {
-    KeyGenerator generator = KeyGenerator.getInstance("AES");                 // TODO: extract constant
+    KeyGenerator generator = KeyGenerator.getInstance(KEY_ALGORITHM);
     SecureRandom random = new SecureRandom();
-    generator.init(256, random);                                              // TODO: extract constant
+    generator.init(KEY_LENGTH_BITS, random);
     return generator.generateKey();
   }
 
   private static IvParameterSpec generateInitializationVector()
   {
     SecureRandom random = new SecureRandom();
-    return new IvParameterSpec(random.generateSeed(16));                      // TODO: extract constant
+    return new IvParameterSpec(random.generateSeed(IV_LENGTH_BYTES));
   }
 
   private static Cipher newCipher(SecretKey symmetricKey, IvParameterSpec iv) throws Exception
   {
-    Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");               // TODO: extract constant
+    Cipher cipher = Cipher.getInstance(CIPHER_ALGORITHM);
     cipher.init(Cipher.ENCRYPT_MODE, symmetricKey, iv);
     return cipher;
   }
@@ -64,6 +69,8 @@ class SymmetricEncryptor
 //
 class SymmetricDecryptor
 {
+  public static final String CIPHER_ALGORITHM = "AES/CBC/PKCS5Padding";
+
   private Cipher _cipher;
 
   public SymmetricDecryptor(SecretKey key, IvParameterSpec iv) throws Exception
@@ -78,7 +85,7 @@ class SymmetricDecryptor
 
   private static Cipher newCipher(SecretKey symmetricKey, IvParameterSpec iv) throws Exception
   {
-    Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");               // TODO: extract constant
+    Cipher cipher = Cipher.getInstance(CIPHER_ALGORITHM);
     cipher.init(Cipher.DECRYPT_MODE, symmetricKey, iv);
     return cipher;
   }
@@ -90,6 +97,8 @@ class SymmetricDecryptor
 //
 class AsymmetricEncryptor
 {
+  public static final String CIPHER_ALGORITHM = "RSA/ECB/PKCS1Padding";
+
   private Cipher _cipher;
 
   public AsymmetricEncryptor(PublicKey publicKey) throws Exception
@@ -104,7 +113,7 @@ class AsymmetricEncryptor
 
   private static Cipher newCipher(PublicKey publicKey) throws Exception
   {
-    Cipher cipher = Cipher.getInstance("RSA/ECB/PKCS1Padding");               // TODO: extract constant
+    Cipher cipher = Cipher.getInstance(CIPHER_ALGORITHM);
     cipher.init(Cipher.ENCRYPT_MODE, publicKey);
     return cipher;    
   }
@@ -116,6 +125,8 @@ class AsymmetricEncryptor
 //
 class AsymmetricDecryptor
 {
+  public static final String CIPHER_ALGORITHM = "RSA/ECB/PKCS1Padding";
+
   private Cipher _cipher;
 
   public AsymmetricDecryptor(PrivateKey privateKey) throws Exception
@@ -130,7 +141,7 @@ class AsymmetricDecryptor
 
   public static Cipher newCipher(PrivateKey privateKey) throws Exception
   {
-    Cipher cipher = Cipher.getInstance("RSA/ECB/PKCS1Padding");               // TODO: extract constant
+    Cipher cipher = Cipher.getInstance(CIPHER_ALGORITHM);
     cipher.init(Cipher.DECRYPT_MODE, privateKey);
     return cipher;    
   }
@@ -142,9 +153,11 @@ class AsymmetricDecryptor
 //
 class AsymmetricKeyReader
 {
+  public static final String KEY_ALGORITHM = "RSA";
+
   public static PrivateKey readPrivateKey(String filenameDer) throws Exception
   {
-    byte[] keyBytes = Files.readAllBytes(Paths.get(filenameDer));
+    byte[] keyBytes = readAllBytes(filenameDer);
     KeyFactory keyFactory = newKeyFactory();
     PKCS8EncodedKeySpec spec = new PKCS8EncodedKeySpec(keyBytes);
     return keyFactory.generatePrivate(spec);
@@ -152,21 +165,30 @@ class AsymmetricKeyReader
 
   public static PublicKey readPublicKey(String filenameDer) throws Exception
   {
-    byte[] keyBytes = Files.readAllBytes(Paths.get(filenameDer));
+    byte[] keyBytes = readAllBytes(filenameDer);
     KeyFactory keyFactory = newKeyFactory();
     X509EncodedKeySpec spec = new X509EncodedKeySpec(keyBytes);
     return keyFactory.generatePublic(spec);
   }
 
+  private static byte[] readAllBytes(String filename) throws Exception
+  {
+    return Files.readAllBytes(Paths.get(filename));
+  }
+
   private static KeyFactory newKeyFactory() throws Exception
   {
-    return KeyFactory.getInstance("RSA");
+    return KeyFactory.getInstance(KEY_ALGORITHM);
   }
 }
 
 
 class Main
 {
+  public static final String PUBLIC_KEY_FILENAME  = "public_key.der";
+  public static final String PRIVATE_KEY_FILENAME = "private_key.der";
+  public static final String SECRET_KEY_ALGORITHM = "AES";
+
   public static void main(String[] args)
   {
     try
@@ -176,33 +198,33 @@ class Main
       System.out.printf("input message:  %s\n", message);
       byte[] messageBytes = message.getBytes();
 
-      // Encrypt the message with a symmetric key.
+      // Encrypt the message with a new symmetric key.
       SymmetricEncryptor symmetricEncryptor = new SymmetricEncryptor();
       byte[] encryptedMessage = symmetricEncryptor.encrypt(messageBytes);
 
-      // Read public key from file.
-      PublicKey publicKey = AsymmetricKeyReader.readPublicKey("public_key.der");          // TODO: extract constant
+      // Read public key from file, for encrypting symmetric key.
+      PublicKey publicKey = AsymmetricKeyReader.readPublicKey(PUBLIC_KEY_FILENAME);
 
-      // Encrypt the symmetric key with an asymmetric key.
+      // Encrypt the symmetric key with the public key.
       AsymmetricEncryptor asymmetricEncriptor = new AsymmetricEncryptor(publicKey);
       byte[] secretKeyBytes = symmetricEncryptor.getKey().getEncoded();
       byte[] encryptedSecretKey = asymmetricEncriptor.encrypt(secretKeyBytes);
 
-      // Encrypt the symmetric key initialization vector with an asymmetric key.
-      byte[] symmetricInitializationVectorBytes = symmetricEncryptor.getInitializationVector().getIV();
-      byte[] encryptedIV = asymmetricEncriptor.encrypt(symmetricInitializationVectorBytes);
+      // Encrypt the symmetric key initialization vector with the public key.
+      byte[] ivBytes = symmetricEncryptor.getInitializationVector().getIV();
+      byte[] encryptedIV = asymmetricEncriptor.encrypt(ivBytes);
 
-      // <encryptedMessage, encryptedSecretKey, and encryptedIV ARE SENT HERE>
+      // <encryptedMessage, encryptedSecretKey, and encryptedIV ARE SENT AND RECEIVED HERE>
 
       // Read private key from file.
-      PrivateKey privateKey = AsymmetricKeyReader.readPrivateKey("private_key.der");      // TODO: extract constant
+      PrivateKey privateKey = AsymmetricKeyReader.readPrivateKey(PRIVATE_KEY_FILENAME);
 
-      // Decrypt the symmetric key with the asymmetric key.
+      // Decrypt the symmetric key with the private key.
       AsymmetricDecryptor asymmetricDecryptor = new AsymmetricDecryptor(privateKey);
       byte[] receivedSecretKeyBytes = asymmetricDecryptor.decrypt(encryptedSecretKey);
-      SecretKey receivedSecretKey = new SecretKeySpec(receivedSecretKeyBytes, "AES");     // TODO: extract constant
+      SecretKey receivedSecretKey = new SecretKeySpec(receivedSecretKeyBytes, SECRET_KEY_ALGORITHM);
 
-      // Decrypt the symmetric key initialization vector with the asymmetric key.
+      // Decrypt the symmetric key initialization vector with the private key.
       byte[] receivedIVBytes = asymmetricDecryptor.decrypt(encryptedIV);
       IvParameterSpec receivedIV = new IvParameterSpec(receivedIVBytes);
 
